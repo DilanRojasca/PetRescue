@@ -1,0 +1,14 @@
+# Backend dependencies for PetRescue Map API
+# FastAPI core framework
+fastapi==0.115.0
+# ASGI server used to run the app locally (uvicorn app.main:app --reload)
+uvicorn[standard]==0.30.0
+# Data validation and settings management
+pydantic==2.9.0
+# Extra packages to support typical FastAPI features used in this project
+# File uploads (for fotos de animales)
+python-multipart==0.0.9
+# Async file operations (útil si luego sirves archivos estáticos)
+aiofiles==23.2.1
+# Image processing and EXIF extraction
+Pillow==10.4.0
