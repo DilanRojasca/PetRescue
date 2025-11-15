@@ -67,7 +67,11 @@ def create_app() -> FastAPI:
     # Root endpoint
     @app.get("/")
     async def root():
-        return {"message": "PetRescue API", "version": "0.1.0"}
+        return {"message": "PetRescue API", "version": "0.1.0", "endpoints": {
+            "health": "/api/v1/health",
+            "animals": "/api/v1/animals/",
+            "upload": "/api/v1/upload/image"
+        }}
 
     return app
 
