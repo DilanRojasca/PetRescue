@@ -10,7 +10,7 @@
 import axios from "axios";
 
 // Usar variable de entorno o fallback a localhost para desarrollo
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, ""); // Remover trailing slash
 const BASE_URL = `${API_BASE_URL}/api/v1`;
 
 // Función helper para obtener la URL completa de una imagen

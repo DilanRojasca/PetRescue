@@ -39,13 +39,9 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    # Configure CORS - Permitir GitHub Pages y localhost para desarrollo
-    allowed_origins = [
-        "https://dilanrojasca.github.io",  # GitHub Pages
-        "http://localhost:5173",  # Vite dev server
-        "http://localhost:3000",  # Alternativa dev server
-        "*"  # Permitir todos en desarrollo (cambiar en producción)
-    ]
+    # Configure CORS - Permitir todos los orígenes
+    # En producción, Railway y Vercel necesitan acceso completo
+    allowed_origins = ["*"]
     
     app.add_middleware(
         CORSMiddleware,
@@ -67,6 +63,11 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
     app.include_router(animals.router, prefix="/api/v1", tags=["animals"])
     app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
+    
+    # Root endpoint
+    @app.get("/")
+    async def root():
+        return {"message": "PetRescue API", "version": "0.1.0"}
 
     return app
 
