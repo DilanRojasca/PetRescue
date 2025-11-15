@@ -39,15 +39,18 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    # Configure CORS - Permitir todos los orígenes en desarrollo
-    # En producción, deberías especificar los orígenes exactos
-    # Nota: No se puede usar allow_origins=["*"] con allow_credentials=True
-    # Para desarrollo, permitimos todos los orígenes sin credentials
+    # Configure CORS - Permitir GitHub Pages y localhost para desarrollo
+    allowed_origins = [
+        "https://dilanrojasca.github.io",  # GitHub Pages
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # Alternativa dev server
+        "*"  # Permitir todos en desarrollo (cambiar en producción)
+    ]
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # En desarrollo: permite todos los orígenes
-        # Para producción, usa: allow_origins=["https://tudominio.com"]
-        allow_credentials=False,  # Cambiado a False para permitir "*"
+        allow_origins=allowed_origins,
+        allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
         expose_headers=["*"],
