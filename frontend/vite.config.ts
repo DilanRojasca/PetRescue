@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 // This keeps things minimal but ready for local development.
 export default defineConfig({
   plugins: [react()],
-  base: "/PetRescue/", // GitHub Pages base path
+  base: process.env.VERCEL ? "/" : "/PetRescue/", // GitHub Pages base path solo si no es Vercel
   server: {
     port: 5173
   }
