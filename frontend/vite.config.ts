@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 // This keeps things minimal but ready for local development.
 export default defineConfig({
   plugins: [react()],
+  base: "/PetRescue/", // GitHub Pages base path
   server: {
     port: 5173
   }

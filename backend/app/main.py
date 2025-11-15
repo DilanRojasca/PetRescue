@@ -39,13 +39,18 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    # Configure CORS
+    # Configure CORS - Permitir todos los orígenes en desarrollo
+    # En producción, deberías especificar los orígenes exactos
+    # Nota: No se puede usar allow_origins=["*"] con allow_credentials=True
+    # Para desarrollo, permitimos todos los orígenes sin credentials
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-        allow_credentials=True,
-        allow_methods=["*"],
+        allow_origins=["*"],  # En desarrollo: permite todos los orígenes
+        # Para producción, usa: allow_origins=["https://tudominio.com"]
+        allow_credentials=False,  # Cambiado a False para permitir "*"
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
+        expose_headers=["*"],
     )
 
     # Create uploads directory if it doesn't exist

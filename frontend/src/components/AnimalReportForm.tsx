@@ -6,6 +6,8 @@
  */
 
 import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 import { createAnimalCase, uploadImage } from "../services/api";
 
 interface AnimalReportFormProps {
@@ -26,21 +28,39 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
   const [submitting, setSubmitting] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   
   const GOOGLE_MAPS_API_KEY = "AIzaSyBDxbOwqbR5LBxyB5zObu-jAcZ31GCovH0";
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const processFile = async (file: File) => {
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Por favor selecciona un archivo de imagen válido");
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("La imagen es demasiado grande. Máximo 10MB");
+      return;
+    }
+
+    // Clean up previous preview URL
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
     setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    const newPreviewUrl = URL.createObjectURL(file);
+    setPreviewUrl(newPreviewUrl);
     
     // Upload and extract EXIF
+    const uploadToast = toast.loading("Subiendo imagen y extrayendo coordenadas...");
     try {
       setUploading(true);
-      setMessage({ type: "success", text: "Subiendo imagen y extrayendo coordenadas..." });
       
       const result = await uploadImage(file);
       setImageUrl(result.image_url);
@@ -48,26 +68,61 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
       if (result.has_gps && result.latitude && result.longitude) {
         setLatitude(result.latitude.toString());
         setLongitude(result.longitude.toString());
-        setMessage({ type: "success", text: "✓ Coordenadas extraídas automáticamente de la foto!" });
+        toast.success("✓ Coordenadas extraídas automáticamente de la foto!", { id: uploadToast });
       } else {
-        setMessage({ type: "success", text: "✓ Imagen subida. No se encontraron coordenadas GPS en la foto." });
+        toast.success("✓ Imagen subida. No se encontraron coordenadas GPS en la foto.", { id: uploadToast });
       }
-    } catch (error) {
-      setMessage({ type: "error", text: "Error al subir la imagen" });
-      console.error(error);
+    } catch (error: any) {
+      console.error("Error uploading image:", error);
+      const errorMessage = error?.response?.data?.detail || error?.message || "Error al subir la imagen";
+      toast.error(errorMessage, { id: uploadToast });
+      // Reset preview on error
+      setPreviewUrl("");
+      setSelectedFile(null);
     } finally {
       setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      await processFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await processFile(file);
     }
   };
 
   const handleAddressSearch = async () => {
     if (!address.trim()) {
-      setMessage({ type: "error", text: "Por favor ingresa una dirección" });
+      toast.error("Por favor ingresa una dirección");
       return;
     }
 
     setGeocoding(true);
-    setMessage({ type: "success", text: "Buscando dirección..." });
+    const geocodeToast = toast.loading("Buscando dirección...");
 
     try {
       const { geocodeAddress } = await import("../services/api");
@@ -76,12 +131,12 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
       if (result) {
         setLatitude(result.lat.toString());
         setLongitude(result.lng.toString());
-        setMessage({ type: "success", text: "✓ Dirección encontrada!" });
+        toast.success("✓ Dirección encontrada!", { id: geocodeToast });
       } else {
-        setMessage({ type: "error", text: "No se pudo encontrar la dirección. Intenta ser más específico." });
+        toast.error("No se pudo encontrar la dirección. Intenta ser más específico.", { id: geocodeToast });
       }
     } catch (error) {
-      setMessage({ type: "error", text: "Error al buscar la dirección" });
+      toast.error("Error al buscar la dirección", { id: geocodeToast });
       console.error(error);
     } finally {
       setGeocoding(false);
@@ -90,18 +145,18 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      setMessage({ type: "error", text: "Geolocalización no disponible en este navegador" });
+      toast.error("Geolocalización no disponible en este navegador");
       return;
     }
 
     setGettingLocation(true);
-    setMessage({ type: "success", text: "Obteniendo tu ubicación precisa..." });
+    const locationToast = toast.loading("Obteniendo tu ubicación precisa...");
 
     // Options for high accuracy location
     const options = {
-      enableHighAccuracy: true,  // Request GPS if available
-      timeout: 10000,            // Wait up to 10 seconds
-      maximumAge: 0              // Don't use cached position
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
     };
 
     navigator.geolocation.getCurrentPosition(
@@ -113,17 +168,7 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
         setLatitude(lat.toString());
         setLongitude(lng.toString());
         
-        console.log("Ubicación obtenida:", {
-          lat,
-          lng,
-          accuracy: `${accuracy.toFixed(0)} metros`,
-          timestamp: new Date(position.timestamp).toLocaleString()
-        });
-        
-        setMessage({ 
-          type: "success", 
-          text: `✓ Ubicación obtenida! (Precisión: ${accuracy.toFixed(0)}m)` 
-        });
+        toast.success(`✓ Ubicación obtenida! (Precisión: ${accuracy.toFixed(0)}m)`, { id: locationToast });
         setGettingLocation(false);
       },
       (error) => {
@@ -141,7 +186,7 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
             break;
         }
         
-        setMessage({ type: "error", text: errorMessage });
+        toast.error(errorMessage, { id: locationToast });
         setGettingLocation(false);
       },
       options
@@ -151,18 +196,52 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    // Validate coordinates
+    if (!latitude || !longitude) {
+      toast.error("Por favor proporciona las coordenadas del animal");
+      return;
+    }
+
+    const latNum = Number(latitude);
+    const lngNum = Number(longitude);
+
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      toast.error("Las coordenadas deben ser números válidos");
+      return;
+    }
+
+    if (latNum < -90 || latNum > 90) {
+      toast.error("La latitud debe estar entre -90 y 90");
+      return;
+    }
+
+    if (lngNum < -180 || lngNum > 180) {
+      toast.error("La longitud debe estar entre -180 y 180");
+      return;
+    }
+
     try {
       setSubmitting(true);
-      setMessage({ type: "success", text: "Creando reporte..." });
+      const submitToast = toast.loading("Creando reporte...");
 
-      await createAnimalCase({
-        description,
-        latitude: Number(latitude),
-        longitude: Number(longitude),
-        image_url: imageUrl || undefined,
-      });
+      const payload: {
+        description: string;
+        latitude: number;
+        longitude: number;
+        image_url?: string;
+      } = {
+        description: description.trim(),
+        latitude: latNum,
+        longitude: lngNum,
+      };
 
-      setMessage({ type: "success", text: "✓ Reporte creado exitosamente!" });
+      if (imageUrl && imageUrl.trim()) {
+        payload.image_url = imageUrl;
+      }
+
+      await createAnimalCase(payload);
+
+      toast.success("✓ Reporte creado exitosamente!", { id: submitToast });
       
       // Reset form
       setDescription("");
@@ -171,6 +250,9 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
       setLongitude("");
       setImageUrl("");
       setSelectedFile(null);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
       setPreviewUrl("");
       setUseManualCoords(false);
       
@@ -178,94 +260,258 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
       if (onReportCreated) {
         onReportCreated();
       }
-
-      setTimeout(() => setMessage(null), 3000);
-    } catch (error) {
-      setMessage({ type: "error", text: "Error al crear el reporte" });
-      console.error(error);
+    } catch (error: any) {
+      console.error("Error creating report:", error);
+      const errorMessage = error?.response?.data?.detail || error?.message || "Error al crear el reporte";
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <form
+    <motion.form
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
       onSubmit={handleSubmit}
+      className="card"
       style={{
-        border: "1px solid #ddd",
-        padding: "1rem",
-        borderRadius: "0.5rem",
+        background: "rgba(255, 255, 255, 0.95)",
+        backdropFilter: "blur(10px)",
       }}
     >
-      <h2>Reportar animal</h2>
-
-      {message && (
-        <div
-          style={{
-            padding: "0.75rem",
-            marginBottom: "1rem",
-            borderRadius: "0.25rem",
-            background: message.type === "success" ? "#d4edda" : "#f8d7da",
-            color: message.type === "success" ? "#155724" : "#721c24",
-            border: `1px solid ${message.type === "success" ? "#c3e6cb" : "#f5c6cb"}`,
-          }}
-        >
-          {message.text}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.75rem",
+        marginBottom: "1.5rem",
+      }}>
+        <div style={{
+          width: "48px",
+          height: "48px",
+          borderRadius: "12px",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "1.5rem",
+        }}>
+          📝
         </div>
-      )}
+        <h2 style={{
+          margin: 0,
+          fontSize: "1.75rem",
+          fontWeight: 700,
+          color: "var(--text-primary)",
+        }}>
+          Reportar Animal
+        </h2>
+      </div>
 
-      <label style={{ display: "block", marginBottom: "0.5rem" }}>
-        Descripción
+
+      <div style={{ marginBottom: "1.5rem" }}>
+        <label className="label">
+          Descripción del caso
+        </label>
         <textarea
           required
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Ej: Perro herido en la pata trasera, necesita ayuda urgente"
-          style={{ width: "100%", minHeight: "4rem", padding: "0.5rem" }}
+          placeholder="Ej: Perro herido en la pata trasera, necesita ayuda urgente. Se encuentra cerca del parque principal..."
+          className="textarea"
+          rows={4}
         />
-      </label>
+      </div>
 
-      <label style={{ display: "block", marginBottom: "0.5rem" }}>
-        📸 Foto del animal
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          disabled={uploading}
-          style={{ display: "block", marginTop: "0.25rem" }}
-        />
-        {uploading && <small style={{ color: "#666" }}>Subiendo...</small>}
-      </label>
+      <div style={{ marginBottom: "1.5rem" }}>
+        <label className="label">
+          📸 Foto del animal
+        </label>
+        <motion.div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          animate={{
+            borderColor: isDragging ? "var(--primary)" : "var(--border-color)",
+            backgroundColor: isDragging ? "rgba(99, 102, 241, 0.05)" : previewUrl ? "transparent" : "var(--bg-secondary)",
+            scale: isDragging ? 1.02 : 1,
+          }}
+          transition={{ duration: 0.2 }}
+          style={{
+            border: `2px dashed ${isDragging ? "var(--primary)" : "var(--border-color)"}`,
+            borderRadius: "var(--border-radius-md)",
+            padding: "1.5rem",
+            textAlign: "center",
+            transition: "all var(--transition-base)",
+            background: previewUrl ? "transparent" : "var(--bg-secondary)",
+            cursor: "pointer",
+          }}
+        >
+          {previewUrl ? (
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <img
+                src={previewUrl}
+                alt="Preview"
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "300px",
+                  borderRadius: "var(--border-radius-md)",
+                  boxShadow: "var(--shadow-md)",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (previewUrl) {
+                    URL.revokeObjectURL(previewUrl);
+                  }
+                  setPreviewUrl("");
+                  setSelectedFile(null);
+                  setImageUrl("");
+                  // Reset file input
+                  const fileInput = document.getElementById("file-upload") as HTMLInputElement;
+                  if (fileInput) {
+                    fileInput.value = "";
+                  }
+                }}
+                style={{
+                  position: "absolute",
+                  top: "-8px",
+                  right: "-8px",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  background: "var(--status-open)",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "1.2rem",
+                  boxShadow: "var(--shadow-md)",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div style={{
+                fontSize: "3rem",
+                marginBottom: "0.5rem",
+              }}>
+                📷
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                disabled={uploading}
+                style={{
+                  display: "none",
+                }}
+                id="file-upload"
+              />
+              <label
+                htmlFor="file-upload"
+                className="btn btn-primary"
+                style={{
+                  cursor: uploading ? "not-allowed" : "pointer",
+                  opacity: uploading ? 0.6 : 1,
+                }}
+              >
+                {uploading ? (
+                  <>
+                    <span className="loading" />
+                    Subiendo...
+                  </>
+                ) : (
+                  "Seleccionar imagen"
+                )}
+              </label>
+              <p style={{
+                marginTop: "0.5rem",
+                fontSize: "var(--font-size-sm)",
+                color: "var(--text-secondary)",
+              }}>
+                La imagen puede contener coordenadas GPS automáticas
+              </p>
+            </div>
+          )}
+          {uploading && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                marginTop: "1rem",
+                width: "100%",
+              }}
+            >
+              <div style={{
+                width: "100%",
+                height: "8px",
+                background: "var(--bg-secondary)",
+                borderRadius: "4px",
+                overflow: "hidden",
+              }}>
+                <motion.div
+                  style={{
+                    height: "100%",
+                    background: "linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%)",
+                    borderRadius: "4px",
+                  }}
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${uploadProgress || 50}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+              <p style={{
+                marginTop: "0.5rem",
+                fontSize: "var(--font-size-xs)",
+                color: "var(--text-secondary)",
+              }}>
+                Subiendo imagen...
+              </p>
+            </motion.div>
+          )}
+        </motion.div>
+      </div>
 
-      {previewUrl && (
-        <div style={{ marginBottom: "0.5rem" }}>
-          <img
-            src={previewUrl}
-            alt="Preview"
-            style={{ maxWidth: "200px", borderRadius: "4px", border: "1px solid #ddd" }}
-          />
-        </div>
-      )}
-
-      <div style={{ 
-        marginBottom: "1rem", 
-        padding: "1rem", 
-        background: "#f8f9fa", 
-        borderRadius: "0.5rem",
-        border: "1px solid #dee2e6" 
+      <div style={{
+        marginBottom: "1.5rem",
+        padding: "1.5rem",
+        background: "var(--bg-secondary)",
+        borderRadius: "var(--border-radius-lg)",
+        border: "1px solid var(--border-color)",
       }}>
-        <h3 style={{ margin: "0 0 1rem 0", fontSize: "1rem" }}>📍 Ubicación del animal</h3>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginBottom: "1rem",
+        }}>
+          <span style={{ fontSize: "1.25rem" }}>📍</span>
+          <h3 style={{
+            margin: 0,
+            fontSize: "1.125rem",
+            fontWeight: 600,
+            color: "var(--text-primary)",
+          }}>
+            Ubicación del animal
+          </h3>
+        </div>
         
-        {/* Address input */}
-        <label style={{ display: "block", marginBottom: "0.5rem" }}>
-          Dirección
-          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+        <div style={{ marginBottom: "1rem" }}>
+          <label className="label">Buscar por dirección</label>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Ej: Calle 26 #57-83, Bogotá"
-              style={{ flex: 1, padding: "0.5rem", borderRadius: "0.25rem", border: "1px solid #ccc" }}
+              className="input"
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -277,63 +523,82 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
               type="button"
               onClick={handleAddressSearch}
               disabled={geocoding || !address.trim()}
-              style={{
-                padding: "0.5rem 1rem",
-                background: geocoding ? "#6c757d" : "#007bff",
-                color: "white",
-                border: "none",
-                borderRadius: "0.25rem",
-                cursor: geocoding || !address.trim() ? "not-allowed" : "pointer",
-                whiteSpace: "nowrap",
-              }}
+              className="btn btn-primary"
             >
-              {geocoding ? "Buscando..." : "🔍 Buscar"}
+              {geocoding ? (
+                <>
+                  <span className="loading" />
+                  Buscando...
+                </>
+              ) : (
+                "🔍 Buscar"
+              )}
             </button>
           </div>
-        </label>
-
-        <div style={{ margin: "1rem 0", textAlign: "center", color: "#666" }}>
-          <small>── o ──</small>
         </div>
 
-        {/* Current location button */}
+        <div style={{
+          margin: "1rem 0",
+          textAlign: "center",
+          color: "var(--text-tertiary)",
+          fontSize: "var(--font-size-sm)",
+        }}>
+          ── o ──
+        </div>
+
         <div style={{ marginBottom: "1rem" }}>
           <button
             type="button"
             onClick={getCurrentLocation}
             disabled={gettingLocation}
-            style={{
-              width: "100%",
-              padding: "0.5rem 1rem",
-              background: "#28a745",
-              color: "white",
-              border: "none",
-              borderRadius: "0.25rem",
-              cursor: gettingLocation ? "not-allowed" : "pointer",
-            }}
+            className="btn btn-secondary"
+            style={{ width: "100%" }}
           >
-            {gettingLocation ? "Obteniendo..." : "📍 Usar mi ubicación actual"}
+            {gettingLocation ? (
+              <>
+                <span className="loading" />
+                Obteniendo ubicación...
+              </>
+            ) : (
+              "📍 Usar mi ubicación actual"
+            )}
           </button>
         </div>
 
-        {/* Toggle manual coordinates */}
         <div style={{ marginBottom: "0.5rem" }}>
-          <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+          <label style={{
+            display: "flex",
+            alignItems: "center",
+            cursor: "pointer",
+            fontSize: "var(--font-size-sm)",
+            color: "var(--text-secondary)",
+          }}>
             <input
               type="checkbox"
               checked={useManualCoords}
               onChange={(e) => setUseManualCoords(e.target.checked)}
-              style={{ marginRight: "0.5rem" }}
+              style={{
+                marginRight: "0.5rem",
+                width: "18px",
+                height: "18px",
+                cursor: "pointer",
+              }}
             />
-            <small>Ingresar coordenadas manualmente</small>
+            Ingresar coordenadas manualmente
           </label>
         </div>
 
-        {/* Manual coordinates (collapsed by default) */}
         {useManualCoords && (
-          <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #dee2e6" }}>
-            <label style={{ display: "block", marginBottom: "0.5rem" }}>
-              Latitud
+          <div style={{
+            marginTop: "1rem",
+            paddingTop: "1rem",
+            borderTop: "1px solid var(--border-color)",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "1rem",
+          }}>
+            <div>
+              <label className="label">Latitud</label>
               <input
                 required
                 type="number"
@@ -341,12 +606,11 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
                 onChange={(e) => setLatitude(e.target.value)}
                 step="0.000001"
                 placeholder="Ej: 4.711"
-                style={{ width: "100%", padding: "0.5rem", borderRadius: "0.25rem", border: "1px solid #ccc" }}
+                className="input"
               />
-            </label>
-
-            <label style={{ display: "block", marginBottom: "0.5rem" }}>
-              Longitud
+            </div>
+            <div>
+              <label className="label">Longitud</label>
               <input
                 required
                 type="number"
@@ -354,41 +618,62 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
                 onChange={(e) => setLongitude(e.target.value)}
                 step="0.000001"
                 placeholder="Ej: -74.0721"
-                style={{ width: "100%", padding: "0.5rem", borderRadius: "0.25rem", border: "1px solid #ccc" }}
+                className="input"
               />
-            </label>
+            </div>
           </div>
         )}
 
-        {/* Show coordinates if set (but not in manual mode) */}
         {!useManualCoords && latitude && longitude && (
-          <div style={{ 
-            marginTop: "0.5rem", 
-            padding: "0.5rem", 
-            background: "#e7f3ff", 
-            borderRadius: "0.25rem",
-            fontSize: "0.875rem" 
+          <div style={{
+            marginTop: "1rem",
+            padding: "0.75rem",
+            background: "rgba(99, 102, 241, 0.1)",
+            borderRadius: "var(--border-radius-md)",
+            fontSize: "var(--font-size-sm)",
+            color: "var(--primary)",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
           }}>
-            <strong>Coordenadas:</strong> {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}
+            <span>✓</span>
+            <span>
+              <strong>Coordenadas:</strong> {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}
+            </span>
           </div>
         )}
       </div>
 
       <button
         type="submit"
-        disabled={submitting || uploading}
+        disabled={submitting || uploading || !description.trim() || !latitude || !longitude}
+        className="btn btn-primary"
         style={{
-          padding: "0.75rem 1.5rem",
-          background: submitting ? "#6c757d" : "#007bff",
-          color: "white",
-          border: "none",
-          borderRadius: "0.25rem",
-          cursor: submitting ? "not-allowed" : "pointer",
+          width: "100%",
+          padding: "0.875rem 1.5rem",
           fontSize: "1rem",
+          fontWeight: 600,
         }}
       >
-        {submitting ? "Enviando..." : "Enviar reporte"}
+        {submitting ? (
+          <>
+            <span className="loading" />
+            Creando reporte...
+          </>
+        ) : (
+          "🚀 Enviar Reporte"
+        )}
       </button>
-    </form>
+      {(!latitude || !longitude) && (
+        <p style={{
+          marginTop: "0.5rem",
+          fontSize: "var(--font-size-xs)",
+          color: "var(--text-secondary)",
+          textAlign: "center",
+        }}>
+          ⚠️ Debes proporcionar las coordenadas antes de enviar
+        </p>
+      )}
+    </motion.form>
   );
 };

@@ -19,7 +19,7 @@ export interface AnimalCasePayload {
 }
 
 export interface AnimalCase {
-  id: string;
+  id: string | number;  // El backend devuelve number, pero lo convertimos a string
   description: string;
   latitude: number;
   longitude: number;
@@ -36,12 +36,40 @@ export interface UploadImageResponse {
 
 export async function createAnimalCase(payload: AnimalCasePayload): Promise<AnimalCase> {
   const response = await axios.post(`${BASE_URL}/animals/`, payload);
-  return response.data;
+  // Convertir ID numérico a string para consistencia
+  return {
+    ...response.data,
+    id: String(response.data.id),
+  };
 }
 
 export async function getAnimalCases(): Promise<AnimalCase[]> {
-  const response = await axios.get(`${BASE_URL}/animals/`);
-  return response.data;
+  try {
+    const response = await axios.get(`${BASE_URL}/animals/`);
+    // Si la respuesta es exitosa, devolvemos los datos (puede ser un array vacío)
+    const data = response.data || [];
+    // Convertir IDs numéricos a strings para consistencia
+    return data.map((case_: any) => ({
+      ...case_,
+      id: String(case_.id),
+    }));
+  } catch (error: any) {
+    // Re-lanzamos el error para que el componente pueda manejarlo
+    // pero preservamos la información del error
+    if (error.response) {
+      // El servidor respondió con un código de error
+      throw error;
+    } else if (error.request) {
+      // La petición se hizo pero no hubo respuesta
+      const networkError = new Error('Network Error');
+      (networkError as any).code = 'ERR_NETWORK';
+      (networkError as any).isNetworkError = true;
+      throw networkError;
+    } else {
+      // Algo más pasó
+      throw error;
+    }
+  }
 }
 
 export async function uploadImage(file: File): Promise<UploadImageResponse> {
@@ -89,5 +117,9 @@ export async function deleteAnimalCase(caseId: string): Promise<void> {
 
 export async function updateAnimalCase(caseId: string, payload: Partial<AnimalCasePayload> & { status?: string }): Promise<AnimalCase> {
   const response = await axios.put(`${BASE_URL}/animals/${caseId}`, payload);
-  return response.data;
+  // Convertir ID numérico a string para consistencia
+  return {
+    ...response.data,
+    id: String(response.data.id),
+  };
 }
