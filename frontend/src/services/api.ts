@@ -9,7 +9,20 @@
 
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8000/api/v1";
+// Usar variable de entorno o fallback a localhost para desarrollo
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const BASE_URL = `${API_BASE_URL}/api/v1`;
+
+// Función helper para obtener la URL completa de una imagen
+export const getImageUrl = (imagePath: string): string => {
+  if (!imagePath) return "";
+  // Si ya es una URL completa, devolverla tal cual
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    return imagePath;
+  }
+  // Si es una ruta relativa, construir la URL completa
+  return `${API_BASE_URL}${imagePath}`;
+};
 
 export interface AnimalCasePayload {
   description: string;

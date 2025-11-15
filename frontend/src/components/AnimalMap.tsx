@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { GoogleMap, LoadScript, Marker, InfoWindow, Circle } from "@react-google-maps/api";
-import { getAnimalCases, AnimalCase } from "../services/api";
+import { getAnimalCases, AnimalCase, getImageUrl } from "../services/api";
 
 const mapContainerStyle = {
   width: "100%",
@@ -491,7 +491,7 @@ export const AnimalMap: React.FC<AnimalMapProps> = ({ refreshTrigger }) => {
                     </p>
                     {selectedCase.image_url && (
                       <img
-                        src={`http://localhost:8000${selectedCase.image_url}`}
+                        src={getImageUrl(selectedCase.image_url || "")}
                         alt="Animal"
                         style={{
                           width: "100%",

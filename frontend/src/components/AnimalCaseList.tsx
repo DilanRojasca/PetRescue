@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
-import { getAnimalCases, deleteAnimalCase, updateAnimalCase, AnimalCase } from "../services/api";
+import { getAnimalCases, deleteAnimalCase, updateAnimalCase, AnimalCase, getImageUrl } from "../services/api";
 import { SkeletonCard } from "./SkeletonLoader";
 import { ConfirmModal } from "./ConfirmModal";
 
@@ -477,7 +477,7 @@ export const AnimalCaseList: React.FC<AnimalCaseListProps> = ({
                         flexShrink: 0,
                       }}>
                         <img
-                          src={`http://localhost:8000${caseItem.image_url}`}
+                          src={getImageUrl(caseItem.image_url || "")}
                           alt="Animal"
                           style={{
                             width: "140px",

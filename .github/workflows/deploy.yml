@@ -35,6 +35,10 @@ jobs:
 
       - name: Build
         working-directory: ./frontend
+        env:
+          # Reemplaza esta URL con la URL real de tu backend desplegado
+          # Puedes usar GitHub Secrets para almacenar esta URL de forma segura
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://tu-backend-url.com' }}
         run: npm run build
 
       - name: Setup Pages
