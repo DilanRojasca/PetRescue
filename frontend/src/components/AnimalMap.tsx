@@ -398,6 +398,21 @@ export const AnimalMap: React.FC<AnimalMapProps> = ({ refreshTrigger }) => {
           googleMapsApiKey={GOOGLE_MAPS_API_KEY}
           onLoad={onLoad}
           onError={onError}
+          loadingElement={
+            <div style={{ 
+              height: "500px", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              background: "var(--bg-secondary)",
+              borderRadius: "var(--border-radius-lg)"
+            }}>
+              <div style={{ textAlign: "center" }}>
+                <div className="loading" style={{ margin: "0 auto 1rem" }} />
+                <p style={{ color: "var(--text-secondary)" }}>Cargando mapa...</p>
+              </div>
+            </div>
+          }
         >
           {isMapLoaded ? (
             <GoogleMap
