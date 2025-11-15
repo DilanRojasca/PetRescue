@@ -80,7 +80,8 @@ export const AnimalMap: React.FC<AnimalMapProps> = ({ refreshTrigger }) => {
     }
   };
 
-  const GOOGLE_MAPS_API_KEY = "AIzaSyBDxbOwqbR5LBxyB5zObu-jAcZ31GCovH0";
+  // Usar variable de entorno o fallback a la key por defecto
+  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyBDxbOwqbR5LBxyB5zObu-jAcZ31GCovH0";
 
   const getStatusLabel = (status: string) => {
     switch (status) {

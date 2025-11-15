@@ -31,7 +31,8 @@ export const AnimalReportForm: React.FC<AnimalReportFormProps> = ({ onReportCrea
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   
-  const GOOGLE_MAPS_API_KEY = "AIzaSyBDxbOwqbR5LBxyB5zObu-jAcZ31GCovH0";
+  // Usar variable de entorno o fallback a la key por defecto
+  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyBDxbOwqbR5LBxyB5zObu-jAcZ31GCovH0";
 
   const processFile = async (file: File) => {
     if (!file) return;
